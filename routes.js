@@ -1,6 +1,9 @@
 const express = require('express')
 const router = express.Router()
 
+let users = []
+let nextId = 1
+
 router.get('/', (req, res) => {
     res.json({message: 'Hello World'})
 })
@@ -55,5 +58,51 @@ router.post('/sum', (req, res) => {
     const result = a+b
     res.json({result: result})
 })
+
+router.get('/users', (req, res) =>{
+    res.json(users)
+})
+
+router.post('/users', (req, res) =>{
+    const name = req.body.name
+    if(!name) return res.status(400).json({ message: `invalid data` })
+    const user = {id: nextId++, name: name}
+    users.push(user)
+    res.status(201).json(user)
+})
+
+router.get('/users/:id', (req, res) =>{
+    const id = Number(req.params.id)
+    let user = users.find(user => user.id === id)
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' })
+    }
+    res.json(user)
+})
+
+router.put('/users/:id', (req, res) =>{
+    const id = Number(req.params.id)
+    const name = req.body.name
+    let user = users.find(user => user.id === id)
+    if(!user) return res.status(400).json({ message: `Not found`})
+    if (!name) {
+        return res.status(400).json({ error: 'Name is required' })
+    }
+    user.name = name
+    res.json(user)
+})
+
+router.delete('/users/:id', (req, res) => {
+    const id = Number(req.params.id)
+    const index = users.findIndex(user => user.id === id)
+
+    if (index === -1) {
+        return res.status(404).json({ error: 'User not found' })
+    }
+
+    users.splice(index, 1)
+    res.json({ message: 'User deleted' })
+})
+
 
 module.exports = router
