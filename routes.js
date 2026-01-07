@@ -1,5 +1,6 @@
 const express = require('express')
 const router = express.Router()
+const pool = require('./db')
 
 let users = []
 let nextId = 1
@@ -59,50 +60,91 @@ router.post('/sum', (req, res) => {
     res.json({result: result})
 })
 
-router.get('/users', (req, res) =>{
-    res.json(users)
+router.get('/users', async (req, res) =>{
+    try{
+        const result = await pool.query('SELECT * FROM users ORDER BY id')
+        res.json(result.rows)
+    } catch(error) {
+        res.status(500).json({ error: err.message })
+    }
 })
 
-router.post('/users', (req, res) =>{
+router.post('/users', async (req, res) =>{
     const name = req.body.name
     if(!name) return res.status(400).json({ message: `invalid data` })
-    const user = {id: nextId++, name: name}
-    users.push(user)
-    res.status(201).json(user)
-})
-
-router.get('/users/:id', (req, res) =>{
-    const id = Number(req.params.id)
-    let user = users.find(user => user.id === id)
-    if (!user) {
-        return res.status(404).json({ error: 'User not found' })
+    try {
+        const result = await pool.query(
+            'INSERT INTO users (name) VALUES ($1) RETURNING *',
+            [name]
+        )
+        res.status(201).json(result.rows[0])
+    } catch (err) {
+        res.status(500).json({ error: err.message })
     }
-    res.json(user)
 })
 
-router.put('/users/:id', (req, res) =>{
+router.get('/users/:id', async (req, res) => {
     const id = Number(req.params.id)
-    const name = req.body.name
-    let user = users.find(user => user.id === id)
-    if(!user) return res.status(400).json({ message: `Not found`})
+
+    try {
+        const result = await pool.query(
+            'SELECT * FROM users WHERE id = $1',
+            [id]
+        )
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' })
+        }
+
+        res.json(result.rows[0])
+    } catch (err) {
+        res.status(500).json({ error: err.message })
+    }
+})
+
+router.put('/users/:id', async (req, res) => {
+    const id = Number(req.params.id)
+    const { name } = req.body
+
     if (!name) {
         return res.status(400).json({ error: 'Name is required' })
     }
-    user.name = name
-    res.json(user)
-})
 
-router.delete('/users/:id', (req, res) => {
-    const id = Number(req.params.id)
-    const index = users.findIndex(user => user.id === id)
+    try {
+        const result = await pool.query(
+            'UPDATE users SET name = $1 WHERE id = $2 RETURNING *',
+            [name, id]
+        )
 
-    if (index === -1) {
-        return res.status(404).json({ error: 'User not found' })
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' })
+        }
+
+        res.json(result.rows[0])
+    } catch (err) {
+        res.status(500).json({ error: err.message })
     }
-
-    users.splice(index, 1)
-    res.json({ message: 'User deleted' })
 })
+
+router.delete('/users/:id', async (req, res) => {
+    const id = Number(req.params.id)
+
+    try {
+        const result = await pool.query(
+            'DELETE FROM users WHERE id = $1 RETURNING *',
+            [id]
+        )
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' })
+        }
+
+        res.json({ message: 'User deleted' })
+    } catch (err) {
+        res.status(500).json({ error: err.message })
+    }
+})
+
 
 
 module.exports = router
